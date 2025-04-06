@@ -2,8 +2,20 @@
     "Markers": [
     ],
     "connectionType": "bluetooth",
+    "demographics": {
+        "birthday": null,
+        "countryOfInfluence": {
+            "iso": "",
+            "printable": ""
+        },
+        "countryOfResidence": {
+            "iso": "",
+            "printable": ""
+        },
+        "gender": "U"
+    },
     "exportApp": "com.emotiv.emotivpro",
-    "exportTime": "2025-04-05T17:17:07.720-07:00",
+    "exportTime": "2025-04-05T21:32:48.505-07:00",
     "eyeActions": {
         "Blink": 10,
         "Look Left": -1,
