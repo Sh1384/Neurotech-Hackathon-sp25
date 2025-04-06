@@ -6,7 +6,6 @@ import threading
 import pandas as pd
 import numpy as np
 import joblib
-import random
 from sklearn.preprocessing import StandardScaler
 
 
@@ -92,60 +91,45 @@ print(f"Channels: {info.channel_count()}")
 print(f"Sampling rate: {info.nominal_srate()} Hz")
 
 # Storage
-data_file_path = 'eeg_data.csv'
+data_file_path = 'live_eeg_data.csv'
 key_file_path = 'downstroke_data.csv'
 
 data = []
+time_between_reels = []
 time_start = datetime.datetime.now()
 key_start = time_start
 pressed = False
 stop_collecting = False
 
-times_watched = []
+# Key listener functions
+def on_press(key):
+    global pressed, key_start, time_between_reels
+    if key == keyboard.Key.down and not pressed:
+        current_time = datetime.datetime.now()
+        delta = current_time - key_start
+        key_start = current_time
+        time_between_reels.append(delta)
+        pressed = True
+
+def on_release(key):
+    global pressed
+    if key == keyboard.Key.down:
+        pressed = False
+
+# Start listener thread
+listener = keyboard.Listener(on_press=on_press, on_release=on_release)
+listener.start()
 
 # Collect EEG samples
+print("Receiving data...")
 
-def run_model(data):
-    
-    num_rows = len(data)
-    num_seconds = num_rows // 128
-    # generate random values from 3-40 that together will add up to num_seconds
-    reel_times = []
-    while num_seconds > 0:
-        reel_time = random.randint(3, min(40, num_seconds))
-        reel_times.append(reel_time)
-        num_seconds -= reel_time
-    # Ensure the last reel time is exactly the remaining seconds
-    if num_seconds > 0:
-        reel_times[-1] += num_seconds
-    
-    data = pd.DataFrame(data, columns=['EEG.AF3', 'EEG.T7', 'EEG.Pz', 'EEG.AF4'])
-    AF3 = []
-    T7 = []
-    Pz = []
-    AF4 = []
-    curr_ind = 0
-    for time in reel_times:
-        num_rows = time * 128  # 128 samples per second
-        af3_avg = data.iloc[curr_ind : curr_ind + num_rows]['EEG.AF3'].mean()
-        t7_avg = data.iloc[curr_ind : curr_ind + num_rows]['EEG.T7'].mean()
-        pz_avg = data.iloc[curr_ind : curr_ind + num_rows]['EEG.Pz'].mean()
-        af4_avg = data.iloc[curr_ind : curr_ind + num_rows]['EEG.AF4'].mean()
-        AF3.append(af3_avg)
-        T7.append(t7_avg)
-        Pz.append(pz_avg)
-        AF4.append(af4_avg)
-        curr_ind += num_rows
-        if curr_ind + 128 > len(data):
-            break
-    
-    data = pd.DataFrame()
-    data['time spent on this reel'] = reel_times
-    data['EEG.AF3'] = AF3
-    data['EEG.T7'] = T7
-    data['EEG.Pz'] = Pz
-    data['EEG.AF4'] = AF4
+def run_model():
+    with open(data_file_path, 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(['timestamp', 'ch3', 'ch4', 'ch5', 'ch7'])  # Optional headers
+        writer.writerows(data)
 
+    data = pd.read_csv(data_file_path)
     model = joblib.load("random_forest_model_new.pkl")
     data = data.dropna()
     data = data.reset_index(drop=True)
@@ -161,15 +145,13 @@ def run_model(data):
         return True
     return False
 
-
-print("Receiving data...")
 while True:
     sample, timestamp = inlet.pull_sample()
     current_time = datetime.datetime.now()
 
     # Check channel count before accessing specific indices
     if len(sample) >= 8:
-        row = [sample[3], sample[4], sample[5], sample[7]]
+        row = [current_time, sample[3], sample[4], sample[5], sample[7]]
         data.append(row)
 
     # Stop after 120 seconds
@@ -177,20 +159,11 @@ while True:
         stop_collecting = run_model()
         if stop_collecting:
             break
-        else:
-            time_start = datetime.datetime.now()
 
-# Save EEG data
-with open(data_file_path, 'w', newline='') as f:
-    writer = csv.writer(f)
-    writer.writerow(['time', 'EEG.AF3', 'EEG.T7', 'EEG.Pz', 'EEG.AF4'])  # Optional headers
-    writer.writerows(data)
-
-#Save key press timings
+# Save key press timings
 with open(key_file_path, 'w', newline='') as f:
     writer = csv.writer(f)
     writer.writerow(['time_since_last_down'])  # Optional header
-    for time in times_watched:
-        writer.writerow([time])
+    writer.writerows([[delta.total_seconds()] for delta in time_between_reels])
 
 print("Data collection complete.")
