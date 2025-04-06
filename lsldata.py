@@ -37,19 +37,20 @@ while True:
     csv_file_row = [current_time, sample[3], sample[4], sample[5], sample[7]]
     data.append(csv_file_row)
     
-    if (keyboard.is_pressed(on_key_down)) {
+
+    if keyboard.is_pressed('down'): 
         time_between_reels.append(current_time - key_start)
         key_start = current_time
-    }
     
-    if ((current_time - time_start).total_seconds() > 120) {
-        with open(file_path, 'w', newline='') as file:
+    if ((current_time - time_start).total_seconds() > 120):
+        with open(data_file_path, 'w', newline='') as file:
             writer = csv.writer(file)
             writer.writerows(data)
+
+        break
 
         with open(key_file_path, 'w', newline='') as file:
             writer = csv.writer(file)
             writer.writerows(time_between_reels)
         
-        # do model stuff here
-    }
+        # do model stuff her
